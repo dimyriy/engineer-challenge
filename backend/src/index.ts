@@ -19,10 +19,11 @@ app.use(errorHandler)
 
 export const server = app.listen(BACKEND_PORT, async () => {
   applicationLogger.info(`🚀  Server ready at ${BACKEND_PORT}`)
-  Promise.resolve(context.prisma.$queryRaw`SELECT now();`).then((result) => {
+  try {
+    const result = await context.prisma.$queryRaw`SELECT now();`
     applicationLogger.info(`Prisma client has validated ${result}`)
-  }).catch((e) => {
+  } catch (e) {
     applicationLogger.error("Got error while validating prisma client", e)
     process.exit(1)
-  })
+  }
 })

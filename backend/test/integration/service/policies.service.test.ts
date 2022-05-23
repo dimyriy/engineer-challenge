@@ -3,8 +3,12 @@ import {CustomerService} from "../../../src/service/customer.service"
 import {PoliciesService} from "../../../src/service/policies.service"
 import {getContext} from "../../../src/db/prisma.client"
 import {cleanupDB} from "../cleanup.database"
-import {InsuranceType, PolicyStatus} from "@prisma/client"
+import {InsuranceType, Policy, PolicyStatus} from "@prisma/client"
 import {server} from "../../../src"
+import {any} from "jest-mock-extended"
+import {randomUUID} from "crypto"
+import {now} from "../../../src/util/util"
+import {NotFoundException} from "../../../src/exceptions"
 
 
 let customerService: CustomerService
@@ -29,28 +33,28 @@ beforeEach(done => {
   customerService.createCustomer({
     firstName: "John",
     lastName: "Smith",
-    dateOfBirth: new Date()
-  }).then(result => {
-    customerId = result.id
+    dateOfBirth: now()
+  }).then(customer => {
+    customerId = customer.id
   }).then(done)
 })
 
 describe("createPolicy", () => {
   test("Should create a new policy", done => {
-    const now = new Date()
+    const timestamp = now()
     policiesService.createPolicy({
       customerId: customerId,
       status: PolicyStatus.ACTIVE,
       endDate: null,
-      startDate: now,
+      startDate: timestamp,
       provider: "google",
       insuranceType: InsuranceType.HEALTH
-    }).then(result => {
-      expect(result).toEqual({
+    }).then(policy => {
+      expect(policy).toEqual({
         id: expect.any(String),
         status: PolicyStatus.ACTIVE,
         endDate: null,
-        startDate: now,
+        startDate: timestamp,
         createdAt: expect.any(Date),
         provider: "google",
         insuranceType: InsuranceType.HEALTH,
@@ -60,3 +64,94 @@ describe("createPolicy", () => {
     })
   })
 })
+
+describe('updatePolicy', () => {
+  test("Should update policy in the DB when policy exists", done => {
+    createPolicy(customerId).then(initial => {
+      const timestamp: Date = now()
+      policiesService.updatePolicy({
+        id: initial.id,
+        policy: {
+          endDate: timestamp,
+          insuranceType: InsuranceType.HOUSEHOLD,
+        }
+      }).then(updated => {
+        expect(updated).toEqual({
+          id: any(String),
+          customerId: customerId,
+          createdAt: initial.createdAt,
+          provider: initial.provider,
+          status: initial.status,
+          startDate: initial.startDate,
+          endDate: timestamp,
+          insuranceType: InsuranceType.HOUSEHOLD
+        })
+        done()
+      })
+    })
+  })
+
+  test("Should throw error when policy doesn't exist", done => {
+    const policyId = randomUUID()
+    policiesService.updatePolicy({
+      id: policyId,
+      policy: {
+        endDate: now(),
+        insuranceType: InsuranceType.HOUSEHOLD,
+      }
+    }).catch(e => {
+      expect(e).toEqual(new NotFoundException("Policy with id " + policyId + " not found"))
+      done()
+    })
+  })
+})
+
+describe('deletePolicy', () => {
+  test("should delete existing policy in DB", done => {
+    createPolicy(customerId).then(initial => {
+      policiesService.deletePolicy({
+        id: initial.id
+      }).then(deleted => {
+        expect(deleted.id).toEqual(initial.id)
+        getContext().prisma.policy.findMany({
+          where: {
+            id: initial.id
+          }
+        }).then(dbPolicies => {
+          expect(dbPolicies).toEqual([])
+          done()
+        })
+      })
+    })
+  })
+
+  test("should throw error when policy doesn't exist", done => {
+    const policyId = randomUUID()
+    policiesService.deletePolicy({
+      id: policyId
+    }).catch(e => {
+      expect(e).toEqual(new NotFoundException("Policy with id " + policyId + " not found"))
+      done()
+    })
+  })
+})
+
+const createPolicy = async (customerId: string): Promise<Policy> => {
+  return getContext().prisma.policy.create({
+    data: {
+      startDate: now(),
+      status: PolicyStatus.ACTIVE,
+      provider: "feather",
+      insuranceType: InsuranceType.HEALTH,
+      customer: {
+        connect: {
+          id: customerId
+        }
+      }
+    }
+  }).then(created => {
+    return {
+      ...created as unknown as Policy
+    }
+  })
+}

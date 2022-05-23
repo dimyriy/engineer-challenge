@@ -3,15 +3,20 @@ import {applicationLogger} from "../middlewares/logger.middleware"
 import {Context} from "../global/context"
 import {now} from "../util/util"
 import {getContext} from "../db/prisma.client"
-import {TODO} from "../exceptions"
+import {NotFoundException} from "../exceptions"
+
+const notFoundCode: string = 'P2025'
 
 export type Pager = {
   start: number,
   limit: number
 }
+
 export type CreatePolicyRequest = Omit<Prisma.PolicyCreateInput, "customer" | "createdAt"> & { customerId: string }
+
 export type SearchPolicyRequest = {
   query?: string,
+  field?: string,
   pager?: Pager
 }
 
@@ -21,7 +26,7 @@ export type DeletePolicyRequest = {
 
 export type UpdatePolicyRequest = {
   id: string,
-  policy: Omit<Prisma.PolicyUpdateInput, "id" | "customer">
+  policy: Omit<Prisma.PolicyUpdateInput, "id" | "customer" | "createdAt">
 }
 
 export class PoliciesService {
@@ -43,9 +48,9 @@ export class PoliciesService {
       : {}
   }
 
-  public createPolicy = (policy: CreatePolicyRequest): Promise<Policy> => {
+  public createPolicy = async (policy: CreatePolicyRequest): Promise<Policy> => {
     applicationLogger.info("Creating policy for input", policy)
-    return this._context.prisma.policy.create({
+    return await this._context.prisma.policy.create({
       data: {
         createdAt: now(),
         endDate: policy.endDate,
@@ -62,24 +67,53 @@ export class PoliciesService {
     })
   }
 
-  public deletePolicy = (deleteRequest: DeletePolicyRequest) => {
+  public deletePolicy = async (deleteRequest: DeletePolicyRequest): Promise<Policy> => {
     applicationLogger.debug("Deleting policies for input", deleteRequest)
-    const deleted = this._context.prisma.policy.delete({
+    return await this._context.prisma.policy.delete({
       where: {
         id: deleteRequest.id
       },
+    }).catch(e => {
+      applicationLogger.error("Got error while removing policy", e)
+      if (e.hasOwnProperty('code') && e.code === notFoundCode) {
+        throw new NotFoundException("Policy with id " + deleteRequest.id + " not found")
+      } else {
+        throw e
+      }
     })
   }
 
-  public updatePolicy = (updateRequest: UpdatePolicyRequest) => {
+  public updatePolicy = async (updateRequest: UpdatePolicyRequest): Promise<Policy> => {
     applicationLogger.debug("Updating policies for input", updateRequest)
-    throw new TODO()
+    return await this._context.prisma.$transaction(async (tx) => {
+      const existingPolicy = await tx.policy.findUnique({
+        where: {
+          id: updateRequest.id
+        }
+      })
+      applicationLogger.debug("Updating policy value", existingPolicy)
+      if (!existingPolicy) {
+        throw new NotFoundException("Policy with id " + updateRequest.id + " not found")
+      }
+      return await tx.policy.update({
+        where: {
+          id: updateRequest.id
+        },
+        data: {
+          endDate: updateRequest.policy.endDate,
+          startDate: updateRequest.policy.startDate,
+          status: updateRequest.policy.status,
+          provider: updateRequest.policy.provider,
+          insuranceType: updateRequest.policy.insuranceType,
+        }
+      })
+    })
   }
 
-  public searchPolicies = (search: SearchPolicyRequest = {}) => {
+  public searchPolicies = async (search: SearchPolicyRequest = {}) => {
     applicationLogger.debug("Searching policies for input", search)
     const query = this._parseWhereInput(search);
-    return this._context.prisma.policy.findMany({
+    return await this._context.prisma.policy.findMany({
       where: {
         ...query
       },
