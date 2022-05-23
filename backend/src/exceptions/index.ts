@@ -32,3 +32,10 @@ export const getMessage = (e: any): string => {
     return "Something Went Wrong"
   }
 }
+
+
+export class TODO extends Error {
+  constructor() {
+    super("Not Implemented");
+  }
+}

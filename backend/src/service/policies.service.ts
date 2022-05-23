@@ -3,10 +3,25 @@ import {applicationLogger} from "../middlewares/logger.middleware"
 import {Context} from "../global/context"
 import {now} from "../util/util"
 import {getContext} from "../db/prisma.client"
+import {TODO} from "../exceptions"
 
+export type Pager = {
+  start: number,
+  limit: number
+}
 export type CreatePolicyRequest = Omit<Prisma.PolicyCreateInput, "customer" | "createdAt"> & { customerId: string }
 export type SearchPolicyRequest = {
-  query?: string
+  query?: string,
+  pager?: Pager
+}
+
+export type DeletePolicyRequest = {
+  id: string
+}
+
+export type UpdatePolicyRequest = {
+  id: string,
+  policy: Omit<Prisma.PolicyUpdateInput, "id" | "customer">
 }
 
 export class PoliciesService {
@@ -47,8 +62,22 @@ export class PoliciesService {
     })
   }
 
+  public deletePolicy = (deleteRequest: DeletePolicyRequest) => {
+    applicationLogger.debug("Deleting policies for input", deleteRequest)
+    const deleted = this._context.prisma.policy.delete({
+      where: {
+        id: deleteRequest.id
+      },
+    })
+  }
+
+  public updatePolicy = (updateRequest: UpdatePolicyRequest) => {
+    applicationLogger.debug("Updating policies for input", updateRequest)
+    throw new TODO()
+  }
+
   public searchPolicies = (search: SearchPolicyRequest = {}) => {
-    applicationLogger.info("Searching policies for input", search)
+    applicationLogger.debug("Searching policies for input", search)
     const query = this._parseWhereInput(search);
     return this._context.prisma.policy.findMany({
       where: {
