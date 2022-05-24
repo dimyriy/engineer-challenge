@@ -40,6 +40,99 @@ beforeEach(done => {
   }).then(() => done())
 })
 
+describe("searchPolicy", () => {
+  test("Should return all policies when no search specified", done => {
+    const timestamp = now()
+    const policies = []
+    for (let i = 0; i < 10; i++) {
+      policies.push({
+        endDate: null,
+        startDate: timestamp,
+        status: PolicyStatus.ACTIVE,
+        provider: 'feather',
+        insuranceType: InsuranceType.HEALTH,
+        customerId: customerId
+      })
+    }
+
+    getContext().prisma.policy.createMany({
+      data: policies
+    }).then(() => {
+      policiesService.searchPolicies().then(result => {
+        expect(result).toBeInstanceOf(Array)
+        expect(result.length).toEqual(10)
+        done()
+      })
+    })
+  })
+
+  test("Should return empty array when nothing matched", done => {
+    const timestamp = now()
+    const policies = []
+    for (let i = 0; i < 10; i++) {
+      policies.push({
+        endDate: null,
+        startDate: timestamp,
+        status: PolicyStatus.ACTIVE,
+        provider: 'feather',
+        insuranceType: InsuranceType.HEALTH,
+        customerId: customerId
+      })
+    }
+
+    getContext().prisma.policy.createMany({
+      data: policies
+    }).then(() => {
+      policiesService.searchPolicies({
+        query: "NotExisting"
+      }).then(result => {
+        expect(result).toBeInstanceOf(Array)
+        expect(result.length).toBe(0)
+        done()
+      })
+    })
+  })
+
+  test("Should take pager into account when returning requests", done => {
+    const timestamp = now()
+    const policies = []
+    for (let i = 0; i < 10; i++) {
+      policies.push({
+        endDate: null,
+        startDate: timestamp,
+        status: PolicyStatus.ACTIVE,
+        provider: 'feather',
+        insuranceType: InsuranceType.HEALTH,
+        customerId: customerId
+      })
+    }
+
+    getContext().prisma.policy.createMany({
+      data: policies
+    }).then(() => {
+      policiesService.searchPolicies({
+        pager: {
+          start: 3,
+          limit: 3
+        }
+      }).then(result => {
+        expect(result).toBeInstanceOf(Array)
+        expect(result.length).toBe(3)
+        policiesService.searchPolicies({
+          pager: {
+            start: 8,
+            limit: 5
+          }
+        }).then(result => {
+          expect(result).toBeInstanceOf(Array)
+          expect(result.length).toBe(2)
+          done()
+        })
+      })
+    })
+  })
+})
+
 describe("createPolicy", () => {
   test("Should create a new policy", done => {
     const timestamp = now()

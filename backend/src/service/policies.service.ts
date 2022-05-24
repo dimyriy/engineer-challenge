@@ -132,6 +132,8 @@ export class PoliciesService {
     applicationLogger.debug("Searching policies for input", search)
     const query = this._parseWhereInput(search);
     return await this._context.prisma.policy.findMany({
+      skip: search?.pager?.start,
+      take: search?.pager?.limit,
       where: {
         ...query
       },
