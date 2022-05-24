@@ -1,11 +1,9 @@
-import {Policy, Prisma} from "@prisma/client"
+import {Policy, PolicyChangeType, Prisma} from "@prisma/client"
 import {applicationLogger} from "../middlewares/logger.middleware"
 import {Context} from "../global/context"
 import {now} from "../util/util"
 import {getContext} from "../db/prisma.client"
 import {NotFoundException} from "../exceptions"
-
-const notFoundCode: string = 'P2025'
 
 export type Pager = {
   start: number,
@@ -13,6 +11,10 @@ export type Pager = {
 }
 
 export type CreatePolicyRequest = Omit<Prisma.PolicyCreateInput, "customer" | "createdAt"> & { customerId: string }
+
+export type GetPolicyHistory = {
+  policyId: string
+}
 
 export type SearchPolicyRequest = {
   query?: string,
@@ -69,17 +71,22 @@ export class PoliciesService {
 
   public deletePolicy = async (deleteRequest: DeletePolicyRequest): Promise<Policy> => {
     applicationLogger.debug("Deleting policies for input", deleteRequest)
-    return await this._context.prisma.policy.delete({
-      where: {
-        id: deleteRequest.id
-      },
-    }).catch(e => {
-      applicationLogger.error("Got error while removing policy", e)
-      if (e.hasOwnProperty('code') && e.code === notFoundCode) {
+    return await this._context.prisma.$transaction(async (tx) => {
+      const existingPolicy = await tx.policy.findUnique({
+        where: {
+          id: deleteRequest.id
+        }
+      })
+      applicationLogger.debug("Updating policy value", existingPolicy)
+      if (!existingPolicy) {
         throw new NotFoundException("Policy with id " + deleteRequest.id + " not found")
-      } else {
-        throw e
       }
+      await this.createPolicyHistory(existingPolicy, PolicyChangeType.DELETE, tx)
+      return await this._context.prisma.policy.delete({
+        where: {
+          id: deleteRequest.id
+        },
+      })
     })
   }
 
@@ -95,6 +102,7 @@ export class PoliciesService {
       if (!existingPolicy) {
         throw new NotFoundException("Policy with id " + updateRequest.id + " not found")
       }
+      await this.createPolicyHistory(existingPolicy, PolicyChangeType.UPDATE, tx)
       return await tx.policy.update({
         where: {
           id: updateRequest.id
@@ -132,6 +140,44 @@ export class PoliciesService {
             dateOfBirth: true
           }
         }
+      }
+    })
+  }
+
+  public createPolicyHistory = async (policy: Policy, policyChangeType: PolicyChangeType, prisma: Prisma.TransactionClient) => {
+    applicationLogger.debug("Creating  policy history for input", policy, policyChangeType)
+    return await prisma.policyHistory.create({
+      data: {
+        endDate: policy.endDate,
+        startDate: policy.startDate,
+        policyId: policy.id,
+        provider: policy.provider,
+        insuranceType: policy.insuranceType,
+        status: policy.status,
+        customerId: policy.customerId,
+        policyCreatedAt: policy.createdAt,
+        policyChangeType: policyChangeType
+      }
+    })
+  }
+
+  public getHistories = async (policyId: string) => {
+    applicationLogger.debug("Getting  policy histories for input", policyId)
+    return await this._context.prisma.policyHistory.findMany({
+      where: {
+        policyId: policyId
+      },
+      select: {
+        id: true,
+        provider: true,
+        customerId: true,
+        insuranceType: true,
+        status: true,
+        startDate: true,
+        endDate: true,
+        policyId: true,
+        policyChangeType: true,
+        policyCreatedAt: true
       }
     })
   }

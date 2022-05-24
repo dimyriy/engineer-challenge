@@ -24,6 +24,11 @@ enum InsuranceType {
   HEALTH
 }
 
+enum PolicyChangeType {
+  UPDATE
+  DELETE
+}
+
 model Customer {
   id            String      @id @default(uuid()) @db.Uuid
   firstName     String      @db.VarChar(255)
@@ -55,4 +60,5 @@ model PolicyHistory {
   startDate         DateTime
   endDate           DateTime?
   createdAt         DateTime      @default(now())
+  policyChangeType  PolicyChangeType
 }

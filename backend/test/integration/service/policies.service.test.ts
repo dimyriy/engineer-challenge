@@ -3,7 +3,7 @@ import {CustomerService} from "../../../src/service/customer.service"
 import {PoliciesService} from "../../../src/service/policies.service"
 import {getContext} from "../../../src/db/prisma.client"
 import {cleanupDB} from "../cleanup.database"
-import {InsuranceType, Policy, PolicyStatus} from "@prisma/client"
+import {InsuranceType, Policy, PolicyChangeType, PolicyStatus} from "@prisma/client"
 import {server} from "../../../src"
 import {any} from "jest-mock-extended"
 import {randomUUID} from "crypto"
@@ -66,7 +66,7 @@ describe("createPolicy", () => {
 })
 
 describe('updatePolicy', () => {
-  test("Should update policy in the DB when policy exists", done => {
+  test("Should update policy in the DB and create history entry when policy exists", done => {
     createPolicy(customerId).then(initial => {
       const timestamp: Date = now()
       policiesService.updatePolicy({
@@ -86,7 +86,27 @@ describe('updatePolicy', () => {
           endDate: timestamp,
           insuranceType: InsuranceType.HOUSEHOLD
         })
-        done()
+        getContext().prisma.policyHistory.findMany({
+          where: {
+            policyId: initial.id
+          }
+        }).then(policyHistories => {
+          expect(policyHistories.length).toBe(1)
+          expect(policyHistories).toContainEqual({
+            id: any(String),
+            policyId: initial.id,
+            customerId: customerId,
+            policyCreatedAt: initial.createdAt,
+            createdAt: any(String),
+            provider: initial.provider,
+            status: initial.status,
+            startDate: initial.startDate,
+            endDate: initial.endDate,
+            insuranceType: initial.insuranceType,
+            policyChangeType: PolicyChangeType.UPDATE
+          })
+          done()
+        })
       })
     })
   })
@@ -107,7 +127,7 @@ describe('updatePolicy', () => {
 })
 
 describe('deletePolicy', () => {
-  test("should delete existing policy in DB", done => {
+  test("Should delete existing policy and create history entry in DB when policy exists", done => {
     createPolicy(customerId).then(initial => {
       policiesService.deletePolicy({
         id: initial.id
@@ -119,19 +139,85 @@ describe('deletePolicy', () => {
           }
         }).then(dbPolicies => {
           expect(dbPolicies).toEqual([])
-          done()
+          getContext().prisma.policyHistory.findMany({
+            where: {
+              policyId: initial.id
+            }
+          }).then(policyHistories => {
+            expect(policyHistories.length).toBe(1)
+            expect(policyHistories).toContainEqual({
+              id: any(String),
+              policyId: initial.id,
+              customerId: customerId,
+              policyCreatedAt: initial.createdAt,
+              createdAt: any(String),
+              provider: initial.provider,
+              status: initial.status,
+              startDate: initial.startDate,
+              endDate: initial.endDate,
+              insuranceType: initial.insuranceType,
+              policyChangeType: PolicyChangeType.DELETE
+            })
+            done()
+          })
         })
       })
     })
   })
 
-  test("should throw error when policy doesn't exist", done => {
+  test("Should throw error when policy doesn't exist", done => {
     const policyId = randomUUID()
     policiesService.deletePolicy({
       id: policyId
     }).catch(e => {
       expect(e).toEqual(new NotFoundException("Policy with id " + policyId + " not found"))
       done()
+    })
+  })
+})
+
+describe("getHistory", () => {
+  test("Should return empty list when no changes exist for policy", done => {
+    createPolicy(customerId).then(initialPolicy => {
+      policiesService.updatePolicy({
+        id: initialPolicy.id,
+        policy: {...initialPolicy, provider: "new-feather"}
+      }).then(() => {
+        policiesService.getHistories(randomUUID())
+          .then(histories => {
+            expect(histories).toEqual([])
+          })
+        done()
+      })
+    })
+  })
+
+
+  test("Should return histories for changed policies", done => {
+    createPolicy(customerId).then(initialPolicy => {
+      policiesService.updatePolicy({
+        id: initialPolicy.id,
+        policy: {...initialPolicy, provider: "new-feather"}
+      }).then(policy => {
+        policiesService.getHistories(policy.id)
+          .then(histories => {
+            expect(histories.length).toEqual(1)
+            expect(histories).toContainEqual({
+              id: any(String),
+              createdAt: any(String),
+              policyId: initialPolicy.id,
+              customerId: initialPolicy.customerId,
+              insuranceType: initialPolicy.insuranceType,
+              startDate: initialPolicy.startDate,
+              endDate: initialPolicy.endDate,
+              policyCreatedAt: initialPolicy.createdAt,
+              provider: initialPolicy.provider,
+              status: initialPolicy.status,
+              policyChangeType: PolicyChangeType.UPDATE
+            })
+          })
+        done()
+      })
     })
   })
 })
