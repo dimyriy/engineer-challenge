@@ -5,7 +5,7 @@ import {errorHandler} from "./middlewares/error.handler.middleware"
 import {indexRoutes} from "./routes/index.routes"
 import {policiesRoutes} from "./routes/policies.routes"
 import {getContext} from "./db/prisma.client"
-
+import "express-async-errors"
 
 export const app = express()
 const context = getContext()
@@ -20,8 +20,8 @@ app.use(errorHandler)
 export const server = app.listen(BACKEND_PORT, async () => {
   applicationLogger.info(`🚀  Server ready at ${BACKEND_PORT}`)
   try {
-    const result = await context.prisma.$queryRaw`SELECT now();`
-    applicationLogger.info(`Prisma client has validated ${result}`)
+    await context.prisma.$queryRaw`SELECT now();`
+    applicationLogger.info(" ‍🌈⃤  Prisma client has validated")
   } catch (e) {
     applicationLogger.error("Got error while validating prisma client", e)
     process.exit(1)

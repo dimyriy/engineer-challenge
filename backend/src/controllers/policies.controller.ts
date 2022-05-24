@@ -1,7 +1,8 @@
 import {Request, Response} from "express/ts4.0"
-import {PoliciesService} from "../service/policies.service"
+import {PoliciesService, PoliciesValidator, UpdatePolicyRequest} from "../service/policies.service"
 import {applicationLogger} from "../middlewares/logger.middleware"
-import {TODO} from "../exceptions"
+import {BadRequestException, TODO} from "../exceptions"
+import {Policy} from "@prisma/client"
 
 export class PoliciesController {
   private _policiesService
@@ -20,7 +21,16 @@ export class PoliciesController {
 
   public put = async (req: Request, res: Response) => {
     applicationLogger.debug("Got PUT request", req, res)
-    throw new TODO()
+    const id: string = req.params.id
+    const policy: Policy = {...req.body}
+    PoliciesValidator.validateId(id)
+    if (!id || !policy) {
+      throw new BadRequestException("id should be provided in param and policy should be provided in body")
+    }
+    const result = await this._policiesService.updatePolicy(<UpdatePolicyRequest>{
+      id: id,
+      policy: policy
+    })
   }
 
   public delete = async (req: Request, res: Response) => {
