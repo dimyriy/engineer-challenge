@@ -41,7 +41,7 @@ export class PoliciesController {
     applicationLogger.debug("Got DELETE request", req, res)
     const deleteRequest: DeletePolicyRequest = {id: req.params.id}
     PoliciesValidator.validateDeletePolicyRequest(deleteRequest)
-    return await this._policiesService.deletePolicy(deleteRequest)
+    res.json(await this._policiesService.deletePolicy(deleteRequest))
   }
 
   public getHistory = async (req: Request, res: Response) => {
@@ -50,15 +50,16 @@ export class PoliciesController {
       policyId: req.params.policyId
     }
     PoliciesValidator.validateGetPolicyHistoryRequest(getPolicyHistoryRequest)
-    return await this._policiesService.getPolicyHistory(getPolicyHistoryRequest)
+    res.json(await this._policiesService.getPolicyHistory(getPolicyHistoryRequest))
   }
 
   public post = async (req: Request, res: Response) => {
+
     applicationLogger.debug("Got POST request", req, res)
     const createPolicyRequest: CreatePolicyRequest = {
       policy: {...req.body}
     }
     PoliciesValidator.validateCreatePolicyRequest(createPolicyRequest)
-    return await this._policiesService.createPolicy(createPolicyRequest)
+    res.json(await this._policiesService.createPolicy(createPolicyRequest))
   }
 }

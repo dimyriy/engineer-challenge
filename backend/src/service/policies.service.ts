@@ -1,7 +1,7 @@
 import {Policy, PolicyChangeType, Prisma} from "@prisma/client"
 import {applicationLogger} from "../middlewares/logger.middleware"
 import {Context} from "../global/context"
-import {now, Nullable, objWithoutUndefinedFields} from "../util/util"
+import {Nullable, objWithoutUndefinedFields} from "../util/util"
 import {getContext} from "../db/prisma.client"
 import {InvalidEntityException, NotFoundException} from "../exceptions"
 
@@ -57,21 +57,30 @@ export class PoliciesService {
 
   public createPolicy = async (policyRequest: CreatePolicyRequest): Promise<Policy> => {
     applicationLogger.info("Creating policy for input", policyRequest)
-    const policy = policyRequest.policy
-    return await this._context.prisma.policy.create({
-      data: {
-        createdAt: now(),
-        endDate: policy.endDate,
-        startDate: policy.startDate,
-        status: policy.status,
-        provider: policy.provider,
-        insuranceType: policy.insuranceType,
-        customer: {
-          connect: {
-            id: policy.customerId
+    return await this._context.prisma.$transaction(async (tx) => {
+      const customer = await tx.customer.findUnique({
+        where: {id: policyRequest.policy.customerId},
+        select: {
+          id: true
+        }
+      })
+      if (!customer) {
+        throw new NotFoundException("Customer with id " + policyRequest.policy.customerId + " not found")
+      }
+      return await tx.policy.create({
+        data: {
+          endDate: policyRequest.policy.endDate,
+          startDate: policyRequest.policy.startDate,
+          status: policyRequest.policy.status,
+          provider: policyRequest.policy.provider,
+          insuranceType: policyRequest.policy.insuranceType,
+          customer: {
+            connect: {
+              id: customer.id
+            }
           }
         }
-      }
+      })
     })
   }
 
@@ -89,7 +98,7 @@ export class PoliciesService {
         throw new NotFoundException("Policy with id " + policyId + " not found")
       }
       await this.createPolicyHistory(existingPolicy, PolicyChangeType.DELETE, tx)
-      return await this._context.prisma.policy.delete({
+      return await tx.policy.delete({
         where: {
           id: policyId
         },
@@ -196,7 +205,7 @@ export class PoliciesValidator {
    */
   public static validateDate(date: any, fieldName: string) {
     if (!(date && Object.prototype.toString.call(date) === "[object Date]" && !isNaN(date))) {
-      throw new InvalidEntityException(fieldName + " should be a date or null, but got " + typeof date + " instead")
+      throw new InvalidEntityException(fieldName + " should be a date, but got " + date + " instead")
     }
   }
 
@@ -207,7 +216,7 @@ export class PoliciesValidator {
    */
   public static validateString(str: any, fieldName: string) {
     if (!(typeof str === 'string' || str instanceof String)) {
-      throw new InvalidEntityException(fieldName + " should be a correct date or null, but got " + typeof str + " instead")
+      throw new InvalidEntityException(fieldName + " should be a correct string, but got " + str + " instead")
     }
   }
 
@@ -241,7 +250,9 @@ export class PoliciesValidator {
    * @param policy
    */
   public static validateCreatePolicy(policy: CreatePolicy) {
-    this.validateDate(policy.endDate, "endDate")
+    if (policy.endDate) {
+      this.validateDate(policy.endDate, "endDate")
+    }
     this.validateDate(policy.startDate, "startDate")
     this.validateString(policy.status, "status")
     this.validateString(policy.insuranceType, "insuranceType")

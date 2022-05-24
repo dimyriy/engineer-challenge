@@ -5,12 +5,14 @@ import {errorHandler} from "./middlewares/error.handler.middleware"
 import {indexRoutes} from "./routes/index.routes"
 import {policiesRoutes} from "./routes/policies.routes"
 import {getContext} from "./db/prisma.client"
-import "express-async-errors"
+
+require("express-async-errors")
+const jsonStringifyDate = require("json-stringify-date")
 
 export const app = express()
 const context = getContext()
 
-app.use(express.json())
+app.use(express.json({reviver: jsonStringifyDate.getReviver()}))
 app.use(requestLogger)
 app.use("/", indexRoutes())
 app.use("/policies", policiesRoutes(context))
