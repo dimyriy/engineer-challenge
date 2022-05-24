@@ -10,7 +10,7 @@ export type Pager = {
   limit: number
 }
 
-export type CreatePolicy = Omit<Policy, "id">
+export type CreatePolicy = Omit<Policy, "id" | "createdAt" | "customer">
 export type UpdatePolicy = Nullable<Omit<Policy, "id" | "customer" | "createdAt">>
 
 export type CreatePolicyRequest = {
@@ -163,7 +163,7 @@ export class PoliciesService {
     })
   }
 
-  public getHistories = async (getRequest: GetPolicyHistoryRequest) => {
+  public getPolicyHistory = async (getRequest: GetPolicyHistoryRequest) => {
     applicationLogger.debug("Getting  policy histories for input", getRequest)
     return await this._context.prisma.policyHistory.findMany({
       where: {
@@ -188,12 +188,52 @@ export class PoliciesService {
 export class PoliciesValidator {
   private static UUID_REGEXP: RegExp = new RegExp("^[\\da-f]{8}-[\\da-f]{4}-[1-5][\\da-f]{3}-[89ab][\\da-f]{3}-[\\da-f]{12}$")
 
+
+  /**
+   * @throws(InvalidEntityException)
+   * @param date
+   * @param fieldName
+   */
+  public static validateDate(date: any, fieldName: string) {
+    if (!(date && Object.prototype.toString.call(date) === "[object Date]" && !isNaN(date))) {
+      throw new InvalidEntityException(fieldName + " should be a date or null, but got " + typeof date + " instead")
+    }
+  }
+
+  /**
+   * @throws(InvalidEntityException)
+   * @param str
+   * @param fieldName
+   */
+  public static validateString(str: any, fieldName: string) {
+    if (!(typeof str === 'string' || str instanceof String)) {
+      throw new InvalidEntityException(fieldName + " should be a correct date or null, but got " + typeof str + " instead")
+    }
+  }
+
   /**
    * @throws(InvalidEntityException)
    * @param policy
    */
   public static validateUpdatePolicy(policy: UpdatePolicy) {
-
+    if (policy.endDate !== null) {
+      this.validateDate(policy.endDate, "endDate")
+    }
+    if (policy.startDate !== null) {
+      this.validateDate(policy.startDate, "startDate")
+    }
+    if (policy.status !== null) {
+      this.validateString(policy.status, "status")
+    }
+    if (policy.insuranceType !== null) {
+      this.validateString(policy.insuranceType, "insuranceType")
+    }
+    if (policy.customerId !== null) {
+      this.validateUuid(policy.customerId, "customerId")
+    }
+    if (policy.provider !== null) {
+      this.validateString(policy.provider, "provider")
+    }
   }
 
   /**
@@ -201,7 +241,16 @@ export class PoliciesValidator {
    * @param policy
    */
   public static validateCreatePolicy(policy: CreatePolicy) {
-
+    this.validateDate(policy.endDate, "endDate")
+    this.validateDate(policy.startDate, "startDate")
+    this.validateString(policy.status, "status")
+    this.validateString(policy.insuranceType, "insuranceType")
+    if (!policy.customerId) {
+      throw new InvalidEntityException("customerId should be present")
+    } else {
+      this.validateUuid(policy.customerId, "customerId")
+    }
+    this.validateString(policy.provider, "provider")
   }
 
   /**
@@ -209,7 +258,7 @@ export class PoliciesValidator {
    * @param updatePolicyRequest
    */
   public static validateUpdatePolicyRequest(updatePolicyRequest: UpdatePolicyRequest) {
-    this.validateId(updatePolicyRequest.id)
+    this.validateUuid(updatePolicyRequest.id, "id")
     this.validateUpdatePolicy(updatePolicyRequest.policy)
   }
 
@@ -223,11 +272,29 @@ export class PoliciesValidator {
 
   /**
    * @throws(InvalidEntityException)
-   * @param id
+   * @param deletePolicyRequest
    */
-  public static validateId(id?: string) {
-    if (!id || !PoliciesValidator.UUID_REGEXP.test(id)) {
-      throw new InvalidEntityException("Wrong id format, should be UUID, got " + id + " instead")
+  public static validateDeletePolicyRequest(deletePolicyRequest: DeletePolicyRequest) {
+    this.validateUuid(deletePolicyRequest.id, "id")
+  }
+
+  /**
+   * @throws(InvalidEntityException)
+   * @param getPolicyHistoryRequest
+   */
+  public static validateGetPolicyHistoryRequest(getPolicyHistoryRequest: GetPolicyHistoryRequest) {
+    this.validateUuid(getPolicyHistoryRequest.policyId, "policyId")
+  }
+
+  /**
+   * @throws(InvalidEntityException)
+   * @param id
+   * @param fieldName
+   */
+  public static validateUuid(id: any, fieldName: string) {
+    this.validateString(id, fieldName)
+    if (!PoliciesValidator.UUID_REGEXP.test(id)) {
+      throw new InvalidEntityException(fieldName + " should be a correct uuid, but got " + id + " instead")
     }
   }
 }

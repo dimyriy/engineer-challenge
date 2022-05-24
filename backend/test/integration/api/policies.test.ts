@@ -1,8 +1,14 @@
 import {describe, expect, test} from "@jest/globals"
 import {app, server} from "../../../src"
 import request, {Response} from "supertest"
+import {getContext} from "../../../src/db/prisma.client"
 
-describe("Test the policies endpoint", function () {
+afterAll(done => {
+  getContext().prisma.$disconnect()
+  server.close(() => done())
+})
+
+describe("Test the policies endpoint", () => {
   test("It should response the GET method", done => {
     request(app)
       .get("/policies")
@@ -11,8 +17,4 @@ describe("Test the policies endpoint", function () {
         done()
       })
   })
-})
-
-afterAll(done => {
-  server.close(done)
 })

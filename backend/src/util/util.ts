@@ -2,11 +2,11 @@ export const now = (): Date => {
   return new Date()
 }
 
-export type Nullable<T> = { [K in keyof T]: T[K] | undefined | null };
+export type Nullable<T> = { [K in keyof T]+?: T[K] | null };
 
 
 export const objWithoutUndefinedFields = (obj: any | undefined | null): any => {
-  if (!(obj instanceof Object)) {
+  if (!(obj instanceof Object) || obj instanceof Array) {
     return obj
   }
   // @ts-ignore

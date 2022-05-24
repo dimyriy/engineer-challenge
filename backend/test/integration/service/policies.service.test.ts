@@ -15,18 +15,19 @@ let customerService: CustomerService
 let policiesService: PoliciesService
 let customerId: string
 
-beforeAll(async () => {
-  await cleanupDB(getContext())
+beforeAll(done => {
   customerService = new CustomerService(getContext())
   policiesService = new PoliciesService(getContext())
-})
-
-afterEach(done => {
-  cleanupDB(getContext()).then(done)
+  cleanupDB(getContext()).then(() => done())
 })
 
 afterAll(done => {
-  server.close(done)
+  getContext().prisma.$disconnect()
+  server.close(() => done())
+})
+
+afterEach(done => {
+  cleanupDB(getContext()).then(() => done())
 })
 
 beforeEach(done => {
@@ -36,19 +37,21 @@ beforeEach(done => {
     dateOfBirth: now()
   }).then(customer => {
     customerId = customer.id
-  }).then(done)
+  }).then(() => done())
 })
 
 describe("createPolicy", () => {
   test("Should create a new policy", done => {
     const timestamp = now()
     policiesService.createPolicy({
-      customerId: customerId,
-      status: PolicyStatus.ACTIVE,
-      endDate: null,
-      startDate: timestamp,
-      provider: "google",
-      insuranceType: InsuranceType.HEALTH
+      policy: {
+        customerId: customerId,
+        status: PolicyStatus.ACTIVE,
+        endDate: null,
+        startDate: timestamp,
+        provider: "google",
+        insuranceType: InsuranceType.HEALTH
+      }
     }).then(policy => {
       expect(policy).toEqual({
         id: expect.any(String),
@@ -183,7 +186,7 @@ describe("getHistory", () => {
         id: initialPolicy.id,
         policy: {...initialPolicy, provider: "new-feather"}
       }).then(() => {
-        policiesService.getHistories(randomUUID())
+        policiesService.getPolicyHistory({policyId: randomUUID()})
           .then(histories => {
             expect(histories).toEqual([])
           })
@@ -199,7 +202,7 @@ describe("getHistory", () => {
         id: initialPolicy.id,
         policy: {...initialPolicy, provider: "new-feather"}
       }).then(policy => {
-        policiesService.getHistories(policy.id)
+        policiesService.getPolicyHistory({policyId: policy.id})
           .then(histories => {
             expect(histories.length).toEqual(1)
             expect(histories).toContainEqual({
