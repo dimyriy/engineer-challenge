@@ -13,19 +13,15 @@ jobs:
         uses: KengoTODA/actions-setup-docker-compose@main
         with:
           version: '1.29.2'
-      - name: Prepare Backend
-        run: make prepare-backend
-      - name: Run yarn install
-        uses: borales/actions-yarn@v2.3.0
+      - name: Install node
+        uses: actions/setup-node@v3
         with:
-          cmd: --cwd backend install
-      - name: Run yarn eslint
-        uses: borales/actions-yarn@v2.3.0
-        with:
-          cmd: --cwd backend eslint
-      - name: Run yarn unit-tests
-        uses: borales/actions-yarn@v2.3.0
-        with:
-          cmd: --cwd backend unit-tests
-      - name: Stop Containers
+          node-version: '16.x'
+      - name: Install yarn
+        run: npm install --global yarn
+      - name: Tests
+        run: make default
+      - name: Build docker image
+        run: make docker-build-backend
+      - name: Stop containers
         run: make stop-all

@@ -5,6 +5,8 @@ backend_home:=${project_home}/backend
 frontend_home:=${project_home}/frontend
 yml_file:=${project_home}/docker-compose.yaml
 
+default: prepare-env stop-all tests stop-all
+
 prepare-env:
 	cp ${backend_home}/.env.example ${backend_home}/.env
 
@@ -26,11 +28,18 @@ docker-compose-stop-backend:
 docker-compose-stop-frontend:
 	cd ${backend_home} && docker-compose stop frontend
 
-yarn-build-backend:
-	cd ${backend_home} && yarn install && yarn prisma generate
-
 yarn-build-frontend:
 	cd ${frontend_home} && yarn install && yarn build
+
+yarn-build-backend:
+	cd ${backend_home} \
+	&& rm -rf node_modules \
+	&& yarn install --frozen-lockfile \
+	&& yarn prisma generate
+
+yarn-migrate-db:
+	cd ${backend_home} \
+	&& yarn prisma migrate dev
 
 yarn-run-backend:
 	cd ${backend_home} && yarn start
@@ -64,7 +73,7 @@ docker-compose-start-database:
 prepare-backend: prepare-env docker-build-backend docker-compose-up-backend docker-compose-migrate docker-compose-seed docker-compose-stop-backend
 
 
-tests: prepare-backend docker-compose-start-database test-backend
+tests: prepare-env docker-compose-start-database yarn-build-backend yarn-migrate-db test-backend
 run-backend: prepare-backend docker-compose-start-database yarn-build-backend yarn-run-backend
 start-backend: prepare-backend docker-compose-start-database docker-compose-up-backend
 stop-backend: docker-compose-stop-backend
