@@ -5,11 +5,13 @@ backend_home:=${project_home}/backend
 frontend_home:=${project_home}/frontend
 yml_file:=${project_home}/docker-compose.yaml
 
-default: prepare-env stop-all tests stop-all
+default: prepare-env add-db-host stop-all tests stop-all
 
 prepare-env:
-	cp ${backend_home}/.env.example ${backend_home}/.env \
-	&& echo "127.0.0.1 db" >> /etc/hosts
+	cp ${backend_home}/.env.example ${backend_home}/.env
+
+add-db-host:
+	echo "127.0.0.1 db" | sudo tee -a /etc/hosts
 
 docker-build-backend:
 	cd ${backend_home} && docker-compose build
