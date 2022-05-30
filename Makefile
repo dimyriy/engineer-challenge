@@ -58,10 +58,15 @@ docker-compose-migrate:
 docker-compose-seed:
 	cd ${backend_home} && docker compose exec backend yarn prisma db seed
 
+docker-compose-start-database:
+	cd ${backend_home} && docker compose up -d db
+
 prepare-backend: prepare-env docker-build-backend docker-compose-up-backend docker-compose-migrate docker-compose-seed docker-compose-stop-backend
 
-run-backend: prepare-backend yarn-build-backend yarn-run-backend
-start-backend: prepare-backend docker-compose-up-backend
+
+tests: prepare-backend docker-compose-start-database test-backend
+run-backend: prepare-backend docker-compose-start-database yarn-build-backend yarn-run-backend
+start-backend: prepare-backend docker-compose-start-database docker-compose-up-backend
 stop-backend: docker-compose-stop-backend
 run-frontend: yarn-build-frontend yarn-run-frontend
 start-frontend: docker-compose-up-frontend
