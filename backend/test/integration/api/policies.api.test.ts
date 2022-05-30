@@ -6,9 +6,12 @@ import {InsuranceType, PolicyStatus} from "@prisma/client"
 import {randomUUID} from "crypto"
 import {cleanupDB, createCustomer, createPolicies, createPolicy} from "../util"
 import {any} from "jest-mock-extended"
+import {PoliciesService} from "../../../src/service/policies.service"
 
 
 let customerId: string
+let policiesService: PoliciesService
+
 beforeAll(done => {
   cleanupDB(getContext()).then(() => done())
 })
@@ -16,6 +19,7 @@ beforeAll(done => {
 beforeEach(done => {
   createCustomer().then(id => {
     customerId = id
+    policiesService = new PoliciesService(getContext())
   }).then(() => done())
 })
 
@@ -38,6 +42,25 @@ describe("Policies API", () => {
           expect(response.statusCode).toBe(200)
           done()
         })
+    })
+
+    it("Should response with policy history", (done) => {
+      createPolicy(customerId).then(policy => {
+        policiesService.updatePolicy({
+          id: policy.id,
+          policy: {
+            status: PolicyStatus.ACTIVE
+          }
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        }).then(() => {
+          request(app)
+            .get(`/policies/${policy.id}/history`)
+            .then((response: Response) => {
+              expect(response.status).toBe(200)
+              done()
+            })
+        })
+      })
     })
 
     it("Should search policies by family members", done => {

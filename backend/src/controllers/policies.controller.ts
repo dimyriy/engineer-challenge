@@ -68,7 +68,7 @@ export class PoliciesController {
   public getHistory = async (req: Request, res: Response) => {
     applicationLogger.debug("Got GET history request", req, res)
     const getPolicyHistoryRequest: GetPolicyHistoryRequest = {
-      policyId: req.params.policyId
+      policyId: req.params.id
     }
     PoliciesValidator.validateGetPolicyHistoryRequest(getPolicyHistoryRequest)
     res.json(await this._policiesService.getPolicyHistory(getPolicyHistoryRequest))
