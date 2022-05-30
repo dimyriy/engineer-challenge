@@ -1,10 +1,10 @@
-FROM node:16.15.0
+FROM node:16-alpine
 
 WORKDIR /app
 
 COPY package.json yarn.lock .env ./
 
-RUN rm -rf node_modules && yarn install --frozen-lockfile
+RUN rm -rf node_modules && yarn install --frozen-lockfile --production=true
 
 COPY . .
 
